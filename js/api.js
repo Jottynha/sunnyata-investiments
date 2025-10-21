@@ -1,6 +1,5 @@
-// URL base da API (mude para produção quando necessário)
-// IMPORTANTE: Após fazer deploy do backend, atualize a URL abaixo
-const PRODUCTION_API_URL = 'https://SEU-APP.onrender.com/api'; // ⚠️ ATUALIZE ESTA URL
+// URL base da API
+const PRODUCTION_API_URL = 'https://sunnyata-investiments.onrender.com/api'; // ✅ URL do Render configurada
 
 const API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:3000/api'
