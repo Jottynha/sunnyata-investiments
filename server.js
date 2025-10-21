@@ -17,7 +17,8 @@ app.get('/api/stocks', (req, res) => {
         return res.json({
             success: true,
             stocks: [],
-            lastUpdate: Date.now()
+            lastUpdate: Date.now(),
+            nextUpdate: getNextUpdateTime()
         });
     }
     
@@ -26,7 +27,8 @@ app.get('/api/stocks', (req, res) => {
         return res.json({
             success: true,
             stocks: stockData.stocks,
-            lastUpdate: stockData.lastUpdate || Date.now()
+            lastUpdate: stockData.lastUpdate || Date.now(),
+            nextUpdate: stockData.nextUpdate || getNextUpdateTime()
         });
     }
     
@@ -34,7 +36,8 @@ app.get('/api/stocks', (req, res) => {
     res.json({
         success: true,
         stocks: stockData,
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
+        nextUpdate: getNextUpdateTime()
     });
 });
 
@@ -47,7 +50,8 @@ app.post('/api/stocks/update', (req, res) => {
     res.json({
         success: true,
         message: 'Ações atualizadas',
-        lastUpdate: now
+        lastUpdate: now,
+        nextUpdate: getNextUpdateTime()
     });
 });app.use(cors());
 app.use(express.json());
@@ -76,11 +80,45 @@ function saveUsers(users) {
     writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
+// Função para obter próximo horário de atualização (a cada 10 minutos exatos)
+function getNextUpdateTime() {
+    const now = new Date();
+    const brasiliaOffset = -3 * 60; // UTC-3 em minutos
+    const localOffset = now.getTimezoneOffset();
+    const offsetDiff = (localOffset - brasiliaOffset) * 60 * 1000;
+    
+    // Horário de Brasília
+    const brasilia = new Date(now.getTime() - offsetDiff);
+    
+    // Próximo múltiplo de 10 minutos
+    const minutes = brasilia.getMinutes();
+    const nextMinute = Math.ceil((minutes + 1) / 10) * 10;
+    
+    brasilia.setMinutes(nextMinute, 0, 0);
+    
+    // Se passou da hora, vai para próxima hora
+    if (nextMinute >= 60) {
+        brasilia.setHours(brasilia.getHours() + 1);
+        brasilia.setMinutes(0, 0, 0);
+    }
+    
+    // Converte de volta para timestamp UTC
+    return brasilia.getTime() + offsetDiff;
+}
+
 function loadStocks() {
     if (existsSync(STOCKS_FILE)) {
         const data = JSON.parse(readFileSync(STOCKS_FILE, 'utf8'));
         // Retorna objeto com stocks e timestamp
-        return data.stocks ? data : { stocks: data, lastUpdate: Date.now() };
+        if (data.stocks) {
+            return data;
+        }
+        // Compatibilidade com formato antigo
+        return { 
+            stocks: data, 
+            lastUpdate: Date.now(),
+            nextUpdate: getNextUpdateTime()
+        };
     }
     return null;
 }
@@ -88,7 +126,8 @@ function loadStocks() {
 function saveStocks(stocks, lastUpdate = Date.now()) {
     const data = {
         stocks,
-        lastUpdate
+        lastUpdate,
+        nextUpdate: getNextUpdateTime()
     };
     writeFileSync(STOCKS_FILE, JSON.stringify(data, null, 2));
 }

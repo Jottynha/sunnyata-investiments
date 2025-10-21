@@ -68,14 +68,18 @@ class StockMarket {
             this.companies = stocksResult.stocks;
             
             // 🔥 NOVO: Sincroniza com o timestamp do servidor
+            if (stocksResult.nextUpdate) {
+                this.nextUpdateTime = new Date(stocksResult.nextUpdate);
+            } else if (stocksResult.lastUpdate) {
+                this.nextUpdateTime = new Date(stocksResult.lastUpdate + CONFIG.UPDATE_INTERVAL);
+            } else {
+                this.nextUpdateTime = new Date(Date.now() + CONFIG.UPDATE_INTERVAL);
+            }
+            
             if (stocksResult.lastUpdate) {
                 this.lastUpdateTime = new Date(stocksResult.lastUpdate);
-                this.nextUpdateTime = new Date(stocksResult.lastUpdate + CONFIG.UPDATE_INTERVAL);
-                console.log(`⏰ Última atualização do servidor: ${this.lastUpdateTime.toLocaleTimeString()}`);
-                console.log(`⏰ Próxima atualização em: ${this.nextUpdateTime.toLocaleTimeString()}`);
-            } else {
-                // Fallback se não houver timestamp
-                this.nextUpdateTime = new Date(Date.now() + CONFIG.UPDATE_INTERVAL);
+                console.log(`⏰ Última atualização: ${this.lastUpdateTime.toLocaleTimeString('pt-BR')}`);
+                console.log(`⏰ Próxima atualização: ${this.nextUpdateTime.toLocaleTimeString('pt-BR')}`);
             }
         } else {
             console.log('🎲 Gerando novas empresas...');
@@ -97,11 +101,20 @@ class StockMarket {
         const result = await API.updateStocks(this.companies);
         
         // 🔥 NOVO: Atualiza timestamps baseado na resposta do servidor
-        if (result.success && result.lastUpdate) {
-            this.lastUpdateTime = new Date(result.lastUpdate);
-            this.nextUpdateTime = new Date(result.lastUpdate + CONFIG.UPDATE_INTERVAL);
-        } else {
-            // Fallback se o servidor não retornar timestamp
+        if (result.success) {
+            if (result.nextUpdate) {
+                this.nextUpdateTime = new Date(result.nextUpdate);
+            } else if (result.lastUpdate) {
+                this.nextUpdateTime = new Date(result.lastUpdate + CONFIG.UPDATE_INTERVAL);
+            }
+            
+            if (result.lastUpdate) {
+                this.lastUpdateTime = new Date(result.lastUpdate);
+            }
+        }
+        
+        // Fallback se o servidor não retornar dados
+        if (!this.nextUpdateTime) {
             const now = Date.now();
             this.lastUpdateTime = new Date(now);
             this.nextUpdateTime = new Date(now + CONFIG.UPDATE_INTERVAL);
