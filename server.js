@@ -8,52 +8,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 30// Obter todas as ações
-app.get('/api/stocks', (req, res) => {
-    const stockData = loadStocks();
-    
-    // Se não há dados, retorna array vazio com timestamp atual
-    if (!stockData) {
-        return res.json({
-            success: true,
-            stocks: [],
-            lastUpdate: Date.now(),
-            nextUpdate: getNextUpdateTime()
-        });
-    }
-    
-    // Se stockData já tem a estrutura nova (com stocks e lastUpdate)
-    if (stockData.stocks) {
-        return res.json({
-            success: true,
-            stocks: stockData.stocks,
-            lastUpdate: stockData.lastUpdate || Date.now(),
-            nextUpdate: stockData.nextUpdate || getNextUpdateTime()
-        });
-    }
-    
-    // Compatibilidade com formato antigo (apenas array de stocks)
-    res.json({
-        success: true,
-        stocks: stockData,
-        lastUpdate: Date.now(),
-        nextUpdate: getNextUpdateTime()
-    });
-});
+const PORT = process.env.PORT || 3000;
 
-// Atualizar ações (chamado pelo sistema a cada 10min)
-app.post('/api/stocks/update', (req, res) => {
-    const { stocks } = req.body;
-    const now = Date.now();
-    saveStocks(stocks, now);
-    
-    res.json({
-        success: true,
-        message: 'Ações atualizadas',
-        lastUpdate: now,
-        nextUpdate: getNextUpdateTime()
-    });
-});app.use(cors());
+// Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
 
@@ -297,19 +255,31 @@ app.post('/api/portfolio/buy', (req, res) => {
     }
     
     // 🔥 NOVO: Aplica impacto de mercado (compra aumenta o preço!)
+    let priceImpact = 0;
     let stockData = loadStocks();
     if (stockData) {
-        const stocks = stockData.stocks || stockData;
-        const updatedStocks = applyMarketImpact(stocks, symbol, quantity, true);
-        saveStocks(updatedStocks); // Mantém o lastUpdate original, não conta como atualização programada
+        let stocks = stockData.stocks || stockData;
+        const stockBefore = stocks.find(s => s.symbol === symbol);
+        const oldPrice = stockBefore ? stockBefore.price : price;
+        stocks = applyMarketImpact(stocks, symbol, quantity, true);
+        const stockAfter = stocks.find(s => s.symbol === symbol);
+        const newPrice = stockAfter ? stockAfter.price : price;
+        priceImpact = newPrice - oldPrice;
+        // Preserva lastUpdate e nextUpdate originais ao salvar mudança de preço
+        saveStocks(stocks, stockData.lastUpdate);
     }
     
     saveUsers(users);
     
+    const impactMessage = priceImpact > 0 
+        ? ` 📈 Sua compra aumentou o preço em ${priceImpact} libras!`
+        : '';
+    
     res.json({
         success: true,
         user,
-        message: `Compra realizada: ${quantity}x ${symbol}`
+        priceImpact,
+        message: `Compra realizada: ${quantity}x ${symbol}${impactMessage}`
     });
 });
 
@@ -365,19 +335,31 @@ app.post('/api/portfolio/sell', (req, res) => {
     }
     
     // 🔥 NOVO: Aplica impacto de mercado (venda diminui o preço!)
+    let priceImpact = 0;
     let stockData = loadStocks();
     if (stockData) {
-        const stocks = stockData.stocks || stockData;
-        const updatedStocks = applyMarketImpact(stocks, symbol, quantity, false);
-        saveStocks(updatedStocks); // Mantém o lastUpdate original
+        let stocks = stockData.stocks || stockData;
+        const stockBefore = stocks.find(s => s.symbol === symbol);
+        const oldPrice = stockBefore ? stockBefore.price : price;
+        stocks = applyMarketImpact(stocks, symbol, quantity, false);
+        const stockAfter = stocks.find(s => s.symbol === symbol);
+        const newPrice = stockAfter ? stockAfter.price : price;
+        priceImpact = newPrice - oldPrice;
+        // Preserva lastUpdate e nextUpdate originais ao salvar mudança de preço
+        saveStocks(stocks, stockData.lastUpdate);
     }
     
     saveUsers(users);
     
+    const impactMessage = priceImpact < 0 
+        ? ` 📉 Sua venda diminuiu o preço em ${Math.abs(priceImpact)} libras!`
+        : '';
+    
     res.json({
         success: true,
         user,
-        message: `Venda realizada: ${quantity}x ${symbol}`
+        priceImpact,
+        message: `Venda realizada: ${quantity}x ${symbol}${impactMessage}`
     });
 });
 
@@ -422,21 +404,48 @@ app.post('/api/portfolio/deposit', (req, res) => {
 
 // Obter ações sincronizadas
 app.get('/api/stocks', (req, res) => {
-    const stocks = loadStocks();
+    const stockData = loadStocks();
+    
+    // Se não há dados, retorna array vazio com timestamp atual
+    if (!stockData) {
+        return res.json({
+            success: true,
+            stocks: [],
+            lastUpdate: Date.now(),
+            nextUpdate: getNextUpdateTime()
+        });
+    }
+    
+    // Se stockData já tem a estrutura nova (com stocks e lastUpdate)
+    if (stockData.stocks) {
+        return res.json({
+            success: true,
+            stocks: stockData.stocks,
+            lastUpdate: stockData.lastUpdate || Date.now(),
+            nextUpdate: stockData.nextUpdate || getNextUpdateTime()
+        });
+    }
+    
+    // Compatibilidade com formato antigo (apenas array de stocks)
     res.json({
         success: true,
-        stocks: stocks || []
+        stocks: stockData,
+        lastUpdate: Date.now(),
+        nextUpdate: getNextUpdateTime()
     });
 });
 
 // Atualizar ações (chamado pelo sistema a cada 10min)
 app.post('/api/stocks/update', (req, res) => {
     const { stocks } = req.body;
-    saveStocks(stocks);
+    const now = Date.now();
+    saveStocks(stocks, now);
     
     res.json({
         success: true,
-        message: 'Ações atualizadas'
+        message: 'Ações atualizadas',
+        lastUpdate: now,
+        nextUpdate: getNextUpdateTime()
     });
 });
 
