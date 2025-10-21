@@ -40,28 +40,11 @@ function saveUsers(users) {
 
 // Função para obter próximo horário de atualização (a cada 10 minutos exatos)
 function getNextUpdateTime() {
-    const now = new Date();
-    const brasiliaOffset = -3 * 60; // UTC-3 em minutos
-    const localOffset = now.getTimezoneOffset();
-    const offsetDiff = (localOffset - brasiliaOffset) * 60 * 1000;
+    const now = Date.now();
+    const tenMinutes = 10 * 60 * 1000; // 10 minutos em milissegundos
     
-    // Horário de Brasília
-    const brasilia = new Date(now.getTime() - offsetDiff);
-    
-    // Próximo múltiplo de 10 minutos
-    const minutes = brasilia.getMinutes();
-    const nextMinute = Math.ceil((minutes + 1) / 10) * 10;
-    
-    brasilia.setMinutes(nextMinute, 0, 0);
-    
-    // Se passou da hora, vai para próxima hora
-    if (nextMinute >= 60) {
-        brasilia.setHours(brasilia.getHours() + 1);
-        brasilia.setMinutes(0, 0, 0);
-    }
-    
-    // Converte de volta para timestamp UTC
-    return brasilia.getTime() + offsetDiff;
+    // Arredonda para o próximo múltiplo de 10 minutos
+    return Math.ceil(now / tenMinutes) * tenMinutes;
 }
 
 function loadStocks() {
@@ -505,9 +488,15 @@ app.get('/api/ranking', (req, res) => {
 // 🔥 NOVO: Estatísticas de mercado (demanda por ação)
 app.get('/api/market/stats', (req, res) => {
     const users = loadUsers();
-    const stocks = loadStocks();
+    const stockData = loadStocks();
     
-    if (!stocks || stocks.length === 0) {
+    // Extrai array de stocks do formato novo ou antigo
+    let stocks = [];
+    if (stockData) {
+        stocks = stockData.stocks || stockData;
+    }
+    
+    if (!stocks || !Array.isArray(stocks) || stocks.length === 0) {
         return res.json({ success: true, stats: [] });
     }
     
