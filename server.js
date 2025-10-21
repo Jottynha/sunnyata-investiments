@@ -108,10 +108,18 @@ app.post('/api/auth/login', (req, res) => {
     const ip = getClientIP(req);
     const { username } = req.body;
     
+    console.log('🔐 Login attempt');
+    console.log('  - IP detected:', ip);
+    console.log('  - Username:', username || 'auto-generated');
+    console.log('  - X-Forwarded-For:', req.headers['x-forwarded-for']);
+    console.log('  - X-Real-IP:', req.headers['x-real-ip']);
+    
     const users = loadUsers();
+    console.log('  - Total users in database:', Object.keys(users).length);
     
     // Verifica se o IP já tem um usuário
     if (users[ip]) {
+        console.log('✅ User authenticated:', users[ip].username);
         return res.json({
             success: true,
             user: users[ip],
@@ -132,6 +140,8 @@ app.post('/api/auth/login', (req, res) => {
     
     users[ip] = newUser;
     saveUsers(users);
+    
+    console.log('✅ User authenticated:', newUser.username);
     
     res.json({
         success: true,
@@ -406,33 +416,44 @@ app.post('/api/portfolio/deposit', (req, res) => {
 app.get('/api/stocks', (req, res) => {
     const stockData = loadStocks();
     
+    console.log('📊 GET /api/stocks');
+    console.log('  - stockData exists:', !!stockData);
+    
     // Se não há dados, retorna array vazio com timestamp atual
     if (!stockData) {
-        return res.json({
+        const response = {
             success: true,
             stocks: [],
             lastUpdate: Date.now(),
             nextUpdate: getNextUpdateTime()
-        });
+        };
+        console.log('  - No data, returning empty with nextUpdate:', new Date(response.nextUpdate).toISOString());
+        return res.json(response);
     }
     
     // Se stockData já tem a estrutura nova (com stocks e lastUpdate)
     if (stockData.stocks) {
-        return res.json({
+        const response = {
             success: true,
             stocks: stockData.stocks,
             lastUpdate: stockData.lastUpdate || Date.now(),
             nextUpdate: stockData.nextUpdate || getNextUpdateTime()
-        });
+        };
+        console.log('  - Returning', stockData.stocks.length, 'stocks');
+        console.log('  - lastUpdate:', new Date(response.lastUpdate).toISOString());
+        console.log('  - nextUpdate:', new Date(response.nextUpdate).toISOString());
+        return res.json(response);
     }
     
     // Compatibilidade com formato antigo (apenas array de stocks)
-    res.json({
+    const response = {
         success: true,
         stocks: stockData,
         lastUpdate: Date.now(),
         nextUpdate: getNextUpdateTime()
-    });
+    };
+    console.log('  - Old format, migrating. NextUpdate:', new Date(response.nextUpdate).toISOString());
+    res.json(response);
 });
 
 // Atualizar ações (chamado pelo sistema a cada 10min)

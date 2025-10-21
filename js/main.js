@@ -63,24 +63,38 @@ class StockMarket {
         // Tenta carregar do servidor
         const stocksResult = await API.getStocks();
         
+        console.log('🔍 Dados recebidos do servidor:', {
+            success: stocksResult.success,
+            stocksCount: stocksResult.stocks ? stocksResult.stocks.length : 0,
+            hasLastUpdate: !!stocksResult.lastUpdate,
+            hasNextUpdate: !!stocksResult.nextUpdate,
+            lastUpdate: stocksResult.lastUpdate,
+            nextUpdate: stocksResult.nextUpdate
+        });
+        
         if (stocksResult.success && stocksResult.stocks && stocksResult.stocks.length > 0) {
             console.log('📦 Carregando ações do servidor...');
             this.companies = stocksResult.stocks;
             
-            // 🔥 NOVO: Sincroniza com o timestamp do servidor
+            // 🔥 SINCRONIZA COM O SERVIDOR (OBRIGATÓRIO!)
             if (stocksResult.nextUpdate) {
                 this.nextUpdateTime = new Date(stocksResult.nextUpdate);
+                console.log('✅ nextUpdateTime sincronizado do servidor!');
             } else if (stocksResult.lastUpdate) {
                 this.nextUpdateTime = new Date(stocksResult.lastUpdate + CONFIG.UPDATE_INTERVAL);
+                console.log('⚠️ nextUpdate não encontrado, calculando a partir de lastUpdate');
             } else {
                 this.nextUpdateTime = new Date(Date.now() + CONFIG.UPDATE_INTERVAL);
+                console.log('❌ Nenhum timestamp encontrado, usando tempo local');
             }
             
             if (stocksResult.lastUpdate) {
                 this.lastUpdateTime = new Date(stocksResult.lastUpdate);
-                console.log(`⏰ Última atualização: ${this.lastUpdateTime.toLocaleTimeString('pt-BR')}`);
-                console.log(`⏰ Próxima atualização: ${this.nextUpdateTime.toLocaleTimeString('pt-BR')}`);
             }
+            
+            console.log(`⏰ Última atualização: ${this.lastUpdateTime ? this.lastUpdateTime.toLocaleTimeString('pt-BR') : 'N/A'}`);
+            console.log(`⏰ Próxima atualização: ${this.nextUpdateTime.toLocaleTimeString('pt-BR')}`);
+            console.log(`⏱️  Faltam: ${Math.round((this.nextUpdateTime - Date.now()) / 1000)} segundos`);
         } else {
             console.log('🎲 Gerando novas empresas...');
             this.companies = generateCompanies();
