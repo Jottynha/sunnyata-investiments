@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔐 Painel Admin - Sunnyata Invests</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .status.admin {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .status.not-admin {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .stat-card h3 {
+            font-size: 0.9em;
+            opacity: 0.8;
+            margin-bottom: 10px;
+        }
+
+        .stat-card .value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .deposits-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .deposits-section h2 {
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+
+        .deposit-card {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #FFC107;
+        }
+
+        .deposit-info {
+            flex: 1;
+        }
+
+        .deposit-info h3 {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        .deposit-info p {
+            opacity: 0.8;
+            margin-bottom: 5px;
+        }
+
+        .deposit-amount {
+            font-size: 2em;
+            font-weight: bold;
+            color: #FFC107;
+            margin: 0 30px;
+        }
+
+        .deposit-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.95em;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-approve {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .btn-reject {
+            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+            color: white;
+        }
+
+        .btn-refresh {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            opacity: 0.7;
+        }
+
+        .empty-state p {
+            font-size: 1.2em;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .deposit-card {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔐 Painel de Administração</h1>
+            <p>Sunnyata Invests</p>
+            <div id="adminStatus" class="status">Verificando...</div>
+            <p style="margin-top: 10px; opacity: 0.7; font-size: 0.9em" id="ipDisplay"></p>
+        </header>
+
+        <div class="stats">
+            <div class="stat-card">
+                <h3>Depósitos Pendentes</h3>
+                <div class="value" id="pendingCount">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Solicitado</h3>
+                <div class="value" id="totalAmount">0 £</div>
+            </div>
+        </div>
+
+        <div class="deposits-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📋 Solicitações de Depósito</h2>
+                <button class="btn-refresh" onclick="loadDeposits()">🔄 Atualizar</button>
+            </div>
+            
+            <div id="depositsContainer">
+                <div class="loading">Carregando...</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        const API_URL = window.location.hostname === 'localhost' 
+            ? 'http://localhost:3000/api'
+            : 'https://sunnyata-investiments.onrender.com/api';
+
+        // Verifica se é admin
+        async function checkAdmin() {
+            try {
+                const response = await fetch(`${API_URL}/admin/check`);
+                const data = await response.json();
+                
+                const statusEl = document.getElementById('adminStatus');
+                const ipEl = document.getElementById('ipDisplay');
+                
+                ipEl.textContent = `IP: ${data.ip}`;
+                
+                if (data.isAdmin) {
+                    statusEl.textContent = '✅ Acesso Administrativo';
+                    statusEl.className = 'status admin';
+                    loadDeposits();
+                } else {
+                    statusEl.textContent = '❌ Acesso Negado';
+                    statusEl.className = 'status not-admin';
+                    document.getElementById('depositsContainer').innerHTML = `
+                        <div class="empty-state">
+                            <h2>🚫 Acesso Restrito</h2>
+                            <p>Você não tem permissão para acessar esta página.</p>
+                            <p style="margin-top: 20px;">
+                                <a href="index.html" style="color: #fff; text-decoration: underline;">
+                                    Voltar para o site principal
+                                </a>
+                            </p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Erro ao verificar admin:', error);
+                document.getElementById('adminStatus').textContent = '⚠️ Erro de Conexão';
+            }
+        }
+
+        // Carrega depósitos pendentes
+        window.loadDeposits = async function() {
+            try {
+                const response = await fetch(`${API_URL}/admin/deposits/pending`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.message);
+                }
+                
+                // Atualiza estatísticas
+                document.getElementById('pendingCount').textContent = data.total;
+                const totalAmount = data.deposits.reduce((sum, d) => sum + d.amount, 0);
+                document.getElementById('totalAmount').textContent = `${totalAmount.toLocaleString('pt-BR')} £`;
+                
+                // Renderiza depósitos
+                const container = document.getElementById('depositsContainer');
+                
+                if (data.deposits.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <h2>✅ Tudo Certo!</h2>
+                            <p>Não há solicitações de depósito pendentes.</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                container.innerHTML = data.deposits.map(deposit => `
+                    <div class="deposit-card" id="deposit-${deposit.depositId}">
+                        <div class="deposit-info">
+                            <h3>👤 ${deposit.username}</h3>
+                            <p>📅 ${new Date(deposit.requestedAt).toLocaleString('pt-BR')}</p>
+                            <p style="font-size: 0.85em; opacity: 0.6;">IP: ${deposit.userIp}</p>
+                        </div>
+                        <div class="deposit-amount">${deposit.amount.toLocaleString('pt-BR')} £</div>
+                        <div class="deposit-actions">
+                            <button class="btn-approve" onclick="approveDeposit('${deposit.userIp}', ${deposit.depositId})">
+                                ✅ Aprovar
+                            </button>
+                            <button class="btn-reject" onclick="rejectDeposit('${deposit.userIp}', ${deposit.depositId})">
+                                ❌ Rejeitar
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                console.error('Erro ao carregar depósitos:', error);
+                document.getElementById('depositsContainer').innerHTML = `
+                    <div class="empty-state">
+                        <h2>⚠️ Erro</h2>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        };
+
+        // Aprovar depósito
+        window.approveDeposit = async function(userIp, depositId) {
+            if (!confirm('Confirma a aprovação deste depósito?')) return;
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/deposits/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userIp, depositId })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ ${data.message}`);
+                    loadDeposits();
+                } else {
+                    alert(`❌ ${data.message}`);
+                }
+            } catch (error) {
+                alert('❌ Erro ao aprovar depósito');
+                console.error(error);
+            }
+        };
+
+        // Rejeitar depósito
+        window.rejectDeposit = async function(userIp, depositId) {
+            const reason = prompt('Motivo da rejeição (opcional):');
+            if (reason === null) return; // Cancelou
+            
+            try {
+                const response = await fetch(`${API_URL}/admin/deposits/reject`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userIp, depositId, reason })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✅ ${data.message}`);
+                    loadDeposits();
+                } else {
+                    alert(`❌ ${data.message}`);
+                }
+            } catch (error) {
+                alert('❌ Erro ao rejeitar depósito');
+                console.error(error);
+            }
+        };
+
+        // Atualiza automaticamente a cada 30 segundos
+        setInterval(loadDeposits, 30000);
+
+        // Inicializa
+        checkAdmin();
+    </script>
+</body>
+</html>

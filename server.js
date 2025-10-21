@@ -10,6 +10,9 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 🔐 IP DO ADMINISTRADOR - CONFIGURE COM SEU IP!
+const ADMIN_IP = '177.212.138.254'; // ⚠️ Substitua pelo seu IP real!
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -114,9 +117,10 @@ app.post('/api/auth/login', (req, res) => {
     const newUser = {
         ip,
         username: username || `Investidor_${Object.keys(users).length + 1}`,
-        balance: 10000, // Saldo inicial de 10.000 libras
+        balance: 0, // Saldo inicial de 0 libras
         portfolio: [], // { symbol, quantity, avgPrice, totalInvested }
         transactions: [], // Histórico
+        pendingDeposits: [], // Depósitos aguardando aprovação
         createdAt: new Date().toISOString(),
         lastLogin: new Date().toISOString()
     };
@@ -356,7 +360,7 @@ app.post('/api/portfolio/sell', (req, res) => {
     });
 });
 
-// Depositar libras
+// Solicitar depósito (aguarda aprovação)
 app.post('/api/portfolio/deposit', (req, res) => {
     const ip = getClientIP(req);
     const { amount } = req.body;
@@ -371,27 +375,33 @@ app.post('/api/portfolio/deposit', (req, res) => {
         });
     }
     
-    if (amount <= 0) {
+    if (amount <= 0 || amount > 100000) {
         return res.status(400).json({
             success: false,
-            message: 'Valor inválido'
+            message: 'Valor inválido (máximo: 100.000 £)'
         });
     }
     
-    user.balance += amount;
+    // Inicializa array se não existir
+    if (!user.pendingDeposits) {
+        user.pendingDeposits = [];
+    }
     
-    user.transactions.unshift({
-        type: 'deposit',
+    // Cria solicitação pendente
+    const depositRequest = {
+        id: Date.now(),
         amount,
-        timestamp: new Date().toISOString()
-    });
+        requestedAt: new Date().toISOString(),
+        status: 'pending'
+    };
     
+    user.pendingDeposits.push(depositRequest);
     saveUsers(users);
     
     res.json({
         success: true,
         user,
-        message: `Depósito realizado: ${amount} libras`
+        message: `Solicitação de depósito enviada! Aguarde aprovação do administrador. (${amount} £)`
     });
 });
 
@@ -532,8 +542,181 @@ app.get('/api/market/stats', (req, res) => {
     });
 });
 
+// ==================== ROTAS DE ADMINISTRAÇÃO ====================
+
+// Middleware para verificar se é admin
+function isAdmin(req) {
+    const ip = getClientIP(req);
+    return ip === ADMIN_IP;
+}
+
+// Listar todas as solicitações de depósito pendentes
+app.get('/api/admin/deposits/pending', (req, res) => {
+    if (!isAdmin(req)) {
+        return res.status(403).json({
+            success: false,
+            message: 'Acesso negado'
+        });
+    }
+    
+    const users = loadUsers();
+    const pendingDeposits = [];
+    
+    Object.values(users).forEach(user => {
+        if (user.pendingDeposits && user.pendingDeposits.length > 0) {
+            user.pendingDeposits.forEach(deposit => {
+                if (deposit.status === 'pending') {
+                    pendingDeposits.push({
+                        depositId: deposit.id,
+                        userIp: user.ip,
+                        username: user.username,
+                        amount: deposit.amount,
+                        requestedAt: deposit.requestedAt
+                    });
+                }
+            });
+        }
+    });
+    
+    // Ordena por data (mais recente primeiro)
+    pendingDeposits.sort((a, b) => new Date(b.requestedAt) - new Date(a.requestedAt));
+    
+    res.json({
+        success: true,
+        deposits: pendingDeposits,
+        total: pendingDeposits.length
+    });
+});
+
+// Aprovar depósito
+app.post('/api/admin/deposits/approve', (req, res) => {
+    if (!isAdmin(req)) {
+        return res.status(403).json({
+            success: false,
+            message: 'Acesso negado'
+        });
+    }
+    
+    const { userIp, depositId } = req.body;
+    
+    const users = loadUsers();
+    const user = users[userIp];
+    
+    if (!user) {
+        return res.status(404).json({
+            success: false,
+            message: 'Usuário não encontrado'
+        });
+    }
+    
+    const deposit = user.pendingDeposits.find(d => d.id === depositId);
+    
+    if (!deposit) {
+        return res.status(404).json({
+            success: false,
+            message: 'Depósito não encontrado'
+        });
+    }
+    
+    if (deposit.status !== 'pending') {
+        return res.status(400).json({
+            success: false,
+            message: 'Depósito já foi processado'
+        });
+    }
+    
+    // Aprova o depósito
+    deposit.status = 'approved';
+    deposit.approvedAt = new Date().toISOString();
+    deposit.approvedBy = ADMIN_IP;
+    
+    // Adiciona saldo
+    user.balance += deposit.amount;
+    
+    // Adiciona transação
+    user.transactions.unshift({
+        type: 'deposit',
+        amount: deposit.amount,
+        timestamp: new Date().toISOString(),
+        approvedBy: 'Admin'
+    });
+    
+    saveUsers(users);
+    
+    console.log(`✅ Depósito aprovado: ${deposit.amount} £ para ${user.username}`);
+    
+    res.json({
+        success: true,
+        message: `Depósito de ${deposit.amount} £ aprovado para ${user.username}`,
+        user
+    });
+});
+
+// Rejeitar depósito
+app.post('/api/admin/deposits/reject', (req, res) => {
+    if (!isAdmin(req)) {
+        return res.status(403).json({
+            success: false,
+            message: 'Acesso negado'
+        });
+    }
+    
+    const { userIp, depositId, reason } = req.body;
+    
+    const users = loadUsers();
+    const user = users[userIp];
+    
+    if (!user) {
+        return res.status(404).json({
+            success: false,
+            message: 'Usuário não encontrado'
+        });
+    }
+    
+    const deposit = user.pendingDeposits.find(d => d.id === depositId);
+    
+    if (!deposit) {
+        return res.status(404).json({
+            success: false,
+            message: 'Depósito não encontrado'
+        });
+    }
+    
+    if (deposit.status !== 'pending') {
+        return res.status(400).json({
+            success: false,
+            message: 'Depósito já foi processado'
+        });
+    }
+    
+    // Rejeita o depósito
+    deposit.status = 'rejected';
+    deposit.rejectedAt = new Date().toISOString();
+    deposit.rejectedBy = ADMIN_IP;
+    deposit.rejectionReason = reason || 'Sem motivo especificado';
+    
+    saveUsers(users);
+    
+    console.log(`❌ Depósito rejeitado: ${deposit.amount} £ de ${user.username}`);
+    
+    res.json({
+        success: true,
+        message: `Depósito de ${deposit.amount} £ rejeitado para ${user.username}`
+    });
+});
+
+// Verificar se o usuário atual é admin
+app.get('/api/admin/check', (req, res) => {
+    res.json({
+        success: true,
+        isAdmin: isAdmin(req),
+        ip: getClientIP(req)
+    });
+});
+
 // Iniciar servidor
 app.listen(PORT, () => {
     console.log(`🏛️ Sunnyata Invests Server rodando na porta ${PORT}`);
     console.log(`📊 Acesse: http://localhost:${PORT}`);
+    console.log(`🔐 Admin IP: ${ADMIN_IP}`);
 });
