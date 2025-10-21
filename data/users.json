@@ -1,0 +1,33 @@
+{
+  "::1": {
+    "ip": "::1",
+    "username": "joão",
+    "balance": 700,
+    "portfolio": [
+      {
+        "symbol": "TUSGE",
+        "quantity": 100,
+        "avgPrice": 94,
+        "totalInvested": 9400,
+        "purchasedAt": "2025-10-21T18:58:01.314Z"
+      }
+    ],
+    "transactions": [
+      {
+        "type": "buy",
+        "symbol": "TUSGE",
+        "quantity": 100,
+        "price": 94,
+        "total": 9400,
+        "timestamp": "2025-10-21T18:58:01.314Z"
+      },
+      {
+        "type": "deposit",
+        "amount": 100,
+        "timestamp": "2025-10-21T18:57:46.755Z"
+      }
+    ],
+    "createdAt": "2025-10-21T18:57:19.422Z",
+    "lastLogin": "2025-10-21T19:18:19.365Z"
+  }
+}

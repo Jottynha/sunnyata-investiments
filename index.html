@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sunnyata Invests - Bolsa de Valores do Reino</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏛️ Sunnyata Invests</h1>
+            <p class="subtitle">Bolsa de Valores das Grandes Nações</p>
+            <div class="update-info">
+                <span id="lastUpdate">Último update: --:--:--</span>
+                <span id="nextUpdate">Próximo em: --:--</span>
+            </div>
+        </header>
+
+        <!-- Painel do Usuário -->
+        <div id="userPanel"></div>
+
+        <div class="market-overview">
+            <div class="stat-card">
+                <span class="stat-label">Empresas Ativas</span>
+                <span class="stat-value" id="totalCompanies">0</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-label">Volume Total</span>
+                <span class="stat-value" id="totalVolume">0</span>
+            </div>
+            <div class="stat-card positive">
+                <span class="stat-label">Em Alta</span>
+                <span class="stat-value" id="companiesUp">0</span>
+            </div>
+            <div class="stat-card negative">
+                <span class="stat-label">Em Baixa</span>
+                <span class="stat-value" id="companiesDown">0</span>
+            </div>
+        </div>
+
+        <div class="filters">
+            <select id="countryFilter">
+                <option value="all">Todas as Nações</option>
+            </select>
+            <select id="sortFilter">
+                <option value="change">Maior Variação</option>
+                <option value="price">Maior Preço</option>
+                <option value="volume">Maior Volume</option>
+                <option value="name">Nome</option>
+            </select>
+        </div>
+
+        <div id="stocksContainer" class="stocks-grid"></div>
+
+        <footer>
+            <p>Sistema de Cotações em Tempo Real • Atualização automática a cada 10 minutos</p>
+        </footer>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
