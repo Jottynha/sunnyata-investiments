@@ -98,16 +98,25 @@ export function updateTimeInfo(lastUpdate, nextUpdateTime) {
     const lastUpdateEl = document.getElementById('lastUpdate');
     const nextUpdateEl = document.getElementById('nextUpdate');
 
-    if (lastUpdate) {
-        lastUpdateEl.textContent = `Último update: ${formatTime(lastUpdate)}`;
+    if (lastUpdate && lastUpdateEl) {
+        const now = new Date();
+        const diffMs = now - lastUpdate;
+        const diffMinutes = Math.floor(diffMs / 60000);
+        const diffSeconds = Math.floor((diffMs % 60000) / 1000);
+        
+        if (diffMinutes > 0) {
+            lastUpdateEl.textContent = `Última atualização: há ${diffMinutes} min e ${diffSeconds} seg`;
+        } else {
+            lastUpdateEl.textContent = `Última atualização: há ${diffSeconds} segundos`;
+        }
     }
 
-    if (nextUpdateTime) {
+    if (nextUpdateTime && nextUpdateEl) {
         const now = new Date();
         const diff = Math.max(0, nextUpdateTime - now);
         const minutes = Math.floor(diff / 60000);
         const seconds = Math.floor((diff % 60000) / 1000);
-        nextUpdateEl.textContent = `Próximo em: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        nextUpdateEl.textContent = `Próxima atualização em: ${minutes}:${seconds.toString().padStart(2, '0')}`;
     }
 }
 

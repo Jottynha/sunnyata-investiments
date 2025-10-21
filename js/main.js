@@ -11,6 +11,7 @@ class StockMarket {
         this.currentFilter = 'all';
         this.currentSort = 'change';
         this.nextUpdateTime = null;
+        this.lastUpdateTime = null; // 🔥 NOVO: Timestamp da última atualização do servidor
         this.updateTimer = null;
         this.clockTimer = null;
         this.user = null;
@@ -65,7 +66,17 @@ class StockMarket {
         if (stocksResult.success && stocksResult.stocks && stocksResult.stocks.length > 0) {
             console.log('📦 Carregando ações do servidor...');
             this.companies = stocksResult.stocks;
-            this.nextUpdateTime = new Date(Date.now() + CONFIG.UPDATE_INTERVAL);
+            
+            // 🔥 NOVO: Sincroniza com o timestamp do servidor
+            if (stocksResult.lastUpdate) {
+                this.lastUpdateTime = new Date(stocksResult.lastUpdate);
+                this.nextUpdateTime = new Date(stocksResult.lastUpdate + CONFIG.UPDATE_INTERVAL);
+                console.log(`⏰ Última atualização do servidor: ${this.lastUpdateTime.toLocaleTimeString()}`);
+                console.log(`⏰ Próxima atualização em: ${this.nextUpdateTime.toLocaleTimeString()}`);
+            } else {
+                // Fallback se não houver timestamp
+                this.nextUpdateTime = new Date(Date.now() + CONFIG.UPDATE_INTERVAL);
+            }
         } else {
             console.log('🎲 Gerando novas empresas...');
             this.companies = generateCompanies();
@@ -82,10 +93,19 @@ class StockMarket {
         
         this.companies = updateStockPrices(this.companies);
         
-        // Salva no servidor
-        await API.updateStocks(this.companies);
+        // Salva no servidor e recebe o novo timestamp
+        const result = await API.updateStocks(this.companies);
         
-        this.nextUpdateTime = new Date(Date.now() + CONFIG.UPDATE_INTERVAL);
+        // 🔥 NOVO: Atualiza timestamps baseado na resposta do servidor
+        if (result.success && result.lastUpdate) {
+            this.lastUpdateTime = new Date(result.lastUpdate);
+            this.nextUpdateTime = new Date(result.lastUpdate + CONFIG.UPDATE_INTERVAL);
+        } else {
+            // Fallback se o servidor não retornar timestamp
+            const now = Date.now();
+            this.lastUpdateTime = new Date(now);
+            this.nextUpdateTime = new Date(now + CONFIG.UPDATE_INTERVAL);
+        }
         
         // Remove classe de animação após um tempo
         setTimeout(() => {
@@ -119,7 +139,9 @@ class StockMarket {
         const container = document.getElementById('stocksContainer');
         renderStocks(filtered, container, this.handleBuyClick.bind(this), this.marketStats);
         updateMarketStats(this.companies);
-        updateTimeInfo(new Date(), this.nextUpdateTime);
+        
+        // 🔥 MODIFICADO: Passa lastUpdateTime para mostrar hora correta
+        updateTimeInfo(this.lastUpdateTime, this.nextUpdateTime);
         
         // Renderiza painel do usuário
         const userContainer = document.getElementById('userPanel');
@@ -221,14 +243,25 @@ class StockMarket {
         if (this.updateTimer) clearInterval(this.updateTimer);
         if (this.clockTimer) clearInterval(this.clockTimer);
 
-        // Timer para atualização de preços
-        this.updateTimer = setInterval(() => {
+        // 🔥 NOVO: Calcula quanto tempo falta para a próxima atualização
+        const now = Date.now();
+        const timeUntilNextUpdate = this.nextUpdateTime ? Math.max(0, this.nextUpdateTime.getTime() - now) : CONFIG.UPDATE_INTERVAL;
+        
+        console.log(`⏰ Próxima atualização em ${Math.round(timeUntilNextUpdate / 1000)} segundos`);
+
+        // Agenda a primeira atualização no momento correto
+        setTimeout(() => {
             this.updatePrices();
-        }, CONFIG.UPDATE_INTERVAL);
+            
+            // Depois da primeira atualização, configura intervalo regular
+            this.updateTimer = setInterval(() => {
+                this.updatePrices();
+            }, CONFIG.UPDATE_INTERVAL);
+        }, timeUntilNextUpdate);
 
         // Timer para atualizar o relógio a cada segundo
         this.clockTimer = setInterval(() => {
-            updateTimeInfo(new Date(), this.nextUpdateTime);
+            updateTimeInfo(this.lastUpdateTime, this.nextUpdateTime);
         }, 1000);
     }
 }

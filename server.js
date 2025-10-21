@@ -8,10 +8,48 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 30// Obter todas as ações
+app.get('/api/stocks', (req, res) => {
+    const stockData = loadStocks();
+    
+    // Se não há dados, retorna array vazio com timestamp atual
+    if (!stockData) {
+        return res.json({
+            success: true,
+            stocks: [],
+            lastUpdate: Date.now()
+        });
+    }
+    
+    // Se stockData já tem a estrutura nova (com stocks e lastUpdate)
+    if (stockData.stocks) {
+        return res.json({
+            success: true,
+            stocks: stockData.stocks,
+            lastUpdate: stockData.lastUpdate || Date.now()
+        });
+    }
+    
+    // Compatibilidade com formato antigo (apenas array de stocks)
+    res.json({
+        success: true,
+        stocks: stockData,
+        lastUpdate: Date.now()
+    });
+});
 
-// Middleware
-app.use(cors());
+// Atualizar ações (chamado pelo sistema a cada 10min)
+app.post('/api/stocks/update', (req, res) => {
+    const { stocks } = req.body;
+    const now = Date.now();
+    saveStocks(stocks, now);
+    
+    res.json({
+        success: true,
+        message: 'Ações atualizadas',
+        lastUpdate: now
+    });
+});app.use(cors());
 app.use(express.json());
 app.use(express.static('.'));
 
@@ -40,13 +78,19 @@ function saveUsers(users) {
 
 function loadStocks() {
     if (existsSync(STOCKS_FILE)) {
-        return JSON.parse(readFileSync(STOCKS_FILE, 'utf8'));
+        const data = JSON.parse(readFileSync(STOCKS_FILE, 'utf8'));
+        // Retorna objeto com stocks e timestamp
+        return data.stocks ? data : { stocks: data, lastUpdate: Date.now() };
     }
     return null;
 }
 
-function saveStocks(stocks) {
-    writeFileSync(STOCKS_FILE, JSON.stringify(stocks, null, 2));
+function saveStocks(stocks, lastUpdate = Date.now()) {
+    const data = {
+        stocks,
+        lastUpdate
+    };
+    writeFileSync(STOCKS_FILE, JSON.stringify(data, null, 2));
 }
 
 // Middleware para obter IP real
@@ -214,10 +258,11 @@ app.post('/api/portfolio/buy', (req, res) => {
     }
     
     // 🔥 NOVO: Aplica impacto de mercado (compra aumenta o preço!)
-    let stocks = loadStocks();
-    if (stocks && stocks.length > 0) {
-        stocks = applyMarketImpact(stocks, symbol, quantity, true);
-        saveStocks(stocks);
+    let stockData = loadStocks();
+    if (stockData) {
+        const stocks = stockData.stocks || stockData;
+        const updatedStocks = applyMarketImpact(stocks, symbol, quantity, true);
+        saveStocks(updatedStocks); // Mantém o lastUpdate original, não conta como atualização programada
     }
     
     saveUsers(users);
@@ -281,10 +326,11 @@ app.post('/api/portfolio/sell', (req, res) => {
     }
     
     // 🔥 NOVO: Aplica impacto de mercado (venda diminui o preço!)
-    let stocks = loadStocks();
-    if (stocks && stocks.length > 0) {
-        stocks = applyMarketImpact(stocks, symbol, quantity, false);
-        saveStocks(stocks);
+    let stockData = loadStocks();
+    if (stockData) {
+        const stocks = stockData.stocks || stockData;
+        const updatedStocks = applyMarketImpact(stocks, symbol, quantity, false);
+        saveStocks(updatedStocks); // Mantém o lastUpdate original
     }
     
     saveUsers(users);
